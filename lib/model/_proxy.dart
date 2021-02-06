@@ -7,7 +7,7 @@ class ProxyConfig {
         .firstWhere((ProxyConfigType t) => t.toString == json['type']);
     switch (configType) {
       case ProxyConfigType.autoproxy:
-        return ProxyAutoConfig(url: json['url'] as String);
+        return ProxyAutoConfig(config: json['config'] as String);
       case ProxyConfigType.http:
         return ProxyHttpConfig(
             host: json['host'] as String, port: json['port'] as String);
@@ -19,8 +19,8 @@ class ProxyConfig {
 }
 
 class ProxyAutoConfig extends ProxyConfig {
-  ProxyAutoConfig({required this.url});
-  final String url;
+  ProxyAutoConfig({required this.config});
+  final String config;
 }
 
 class ProxyHttpConfig extends ProxyConfig {
