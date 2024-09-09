@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(runner LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(BINARY_NAME "platform_proxy_example")
 set(APPLICATION_ID "io.yamsergey.flutter.platform_proxy")
 
