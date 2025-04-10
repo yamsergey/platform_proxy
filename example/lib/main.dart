@@ -1,26 +1,23 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:platform_proxy/platform_proxy.dart';
-import 'package:platform_proxy/proxy_httpclient.dart';
 
 void main() {
-  // WidgetsFlutterBinding.ensureInitialized();
-  // HttpOverrides.global = PlatformProxyHttpOverrides(PlatformProxy());
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
   @override
-  _MyAppState createState() => _MyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
-  final client = ProxyAwareHttpClient(client: HttpClient(), platformProxy: PlatformProxy());
+  final _platformProxyPlugin = PlatformProxy();
 
   @override
   void initState() {
@@ -32,9 +29,10 @@ class _MyAppState extends State<MyApp> {
   Future<void> initPlatformState() async {
     String platformVersion;
     // Platform messages may fail, so we use a try/catch PlatformException.
+    // We also handle the message potentially returning null.
     try {
-      platformVersion = (await PlatformProxy().getPlatformProxies(url: "https://google.com")).getProxiesAsPac();
-      client.getUrl(Uri.parse('http://platform.proxy.io')).then((value) => value.close()).then((value) {});
+      platformVersion =
+          await _platformProxyPlugin.getPlatformVersion() ?? 'Unknown platform version';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -54,12 +52,10 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const SelectableText('Plugin example app'),
+          title: const Text('Plugin example app'),
         ),
         body: Center(
-          child: Column(children:[TextButton(child: Text("Send"), onPressed: () {
-            client.getUrl(Uri.parse('https://google.com')).then((value) => value.close());
-          }), SelectableText('Running on: $_platformVersion\n')]),
+          child: Text('Running on: $_platformVersion\n'),
         ),
       ),
     );
