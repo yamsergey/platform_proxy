@@ -18,6 +18,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url "https://storage.googleapis.com/download.flutter.io"
+        }
     }
 }
 
@@ -48,8 +51,11 @@ android {
     }
 
     dependencies {
-        testImplementation("org.jetbrains.kotlin:kotlin-test")
-        testImplementation("org.mockito:mockito-core:5.0.0")
+        compileOnly "io.flutter:flutter_embedding_debug:1.0.0-18b71d647a292a980abb405ac7d16fe1f0b20434"
+
+        testImplementation "io.flutter:flutter_embedding_debug:1.0.0-18b71d647a292a980abb405ac7d16fe1f0b20434"
+        testImplementation "org.jetbrains.kotlin:kotlin-test"
+        testImplementation "org.mockito:mockito-core:5.0.0"
     }
 
     testOptions {
