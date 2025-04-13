@@ -5,14 +5,13 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.net.URI
 
-/** PlatformProxyPlugin */
 class PlatformProxyPlugin: FlutterPlugin, MethodCallHandler {
-  /// The MethodChannel that will the communication between Flutter and native Android
-  ///
-  /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-  /// when the Flutter Engine is detached from the Activity
+
   private lateinit var channel : MethodChannel
+
+  private val proxyResolver = ProxyResolver()
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "platform_proxy")
@@ -20,8 +19,17 @@ class PlatformProxyPlugin: FlutterPlugin, MethodCallHandler {
   }
 
   override fun onMethodCall(call: MethodCall, result: Result) {
-    if (call.method == "getPlatformVersion") {
-      result.success("Android ${android.os.Build.VERSION.RELEASE}")
+    if (call.method == "getPlatformProxy") {
+      val url = call.argument<String>("url")
+
+      if (url == null) {
+        result.error("INVALID_ARGUMENT", "URL is null", null)
+        return
+      }
+
+      val proxies = proxyResolver.resolve(url)
+      val stringifier = ProxyStringifier(proxies)
+      result.success(stringifier.stringify(URI.create(url)))
     } else {
       result.notImplemented()
     }
