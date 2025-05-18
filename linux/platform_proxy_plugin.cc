@@ -4,6 +4,7 @@
 #include <gtk/gtk.h>
 #include <sys/utsname.h>
 #include <json-glib/json-glib.h>
+#include <gio/gio.h>
 
 #include <cstring>
 
@@ -45,21 +46,125 @@ static void platform_proxy_plugin_handle_method_call(
 }
 
 FlMethodResponse* get_platform_proxy(const gchar* url) {
-  // Read proxy environment variables
-  const char* http_proxy = getenv("http_proxy");
-  const char* https_proxy = getenv("https_proxy");
-  const char* no_proxy = getenv("no_proxy");
+  // Try GNOME proxy settings first
+  GSettings* proxy_settings = g_settings_new("org.gnome.system.proxy");
+  const gchar* mode = g_settings_get_string(proxy_settings, "mode");
+  gboolean gnome_manual = g_strcmp0(mode, "manual") == 0;
+  gboolean gnome_auto = g_strcmp0(mode, "auto") == 0;
+  g_free((gchar*)mode);
 
-  // Build a JSON array of proxies (mimicking your macOS/iOS output)
   JsonBuilder* builder = json_builder_new();
   json_builder_begin_array(builder);
 
+  if (gnome_manual) {
+    // HTTP
+    GSettings* http_settings = g_settings_new("org.gnome.system.proxy.http");
+    gchar* host = g_settings_get_string(http_settings, "host");
+    gint port = g_settings_get_int(http_settings, "port");
+    if (host && *host) {
+      json_builder_begin_object(builder);
+      json_builder_set_member_name(builder, "host");
+      json_builder_add_string_value(builder, host);
+      json_builder_set_member_name(builder, "port");
+      json_builder_add_string_value(builder, port > 0 ? g_strdup_printf("%d", port) : "");
+      json_builder_set_member_name(builder, "user");
+      json_builder_add_string_value(builder, "");
+      json_builder_set_member_name(builder, "password");
+      json_builder_add_string_value(builder, "");
+      json_builder_set_member_name(builder, "type");
+      json_builder_add_string_value(builder, "http");
+      json_builder_end_object(builder);
+    }
+    g_free(host);
+    g_object_unref(http_settings);
+    // HTTPS
+    GSettings* https_settings = g_settings_new("org.gnome.system.proxy.https");
+    host = g_settings_get_string(https_settings, "host");
+    port = g_settings_get_int(https_settings, "port");
+    if (host && *host) {
+      json_builder_begin_object(builder);
+      json_builder_set_member_name(builder, "host");
+      json_builder_add_string_value(builder, host);
+      json_builder_set_member_name(builder, "port");
+      json_builder_add_string_value(builder, port > 0 ? g_strdup_printf("%d", port) : "");
+      json_builder_set_member_name(builder, "user");
+      json_builder_add_string_value(builder, "");
+      json_builder_set_member_name(builder, "password");
+      json_builder_add_string_value(builder, "");
+      json_builder_set_member_name(builder, "type");
+      json_builder_add_string_value(builder, "https");
+      json_builder_end_object(builder);
+    }
+    g_free(host);
+    g_object_unref(https_settings);
+    g_object_unref(proxy_settings);
+  } else if (gnome_auto) {
+    // Optionally, handle auto-config (PAC) here
+    g_object_unref(proxy_settings);
+  } else {
+    g_object_unref(proxy_settings);
+    // Try KDE (kioslaverc)
+    gchar* kde_config = g_build_filename(g_get_home_dir(), ".config", "kioslaverc", NULL);
+    GKeyFile* key_file = g_key_file_new();
+    if (g_key_file_load_from_file(key_file, kde_config, G_KEY_FILE_NONE, NULL)) {
+      gchar* http_proxy = g_key_file_get_string(key_file, "Proxy Settings", "httpProxy", NULL);
+      gchar* https_proxy = g_key_file_get_string(key_file, "Proxy Settings", "httpsProxy", NULL);
+      if (http_proxy && *http_proxy) {
+        // Parse URL for host/port
+        GUri* uri = g_uri_parse(http_proxy, G_URI_FLAGS_NONE, NULL);
+        const gchar* host = g_uri_get_host(uri);
+        gint port = g_uri_get_port(uri);
+        json_builder_begin_object(builder);
+        json_builder_set_member_name(builder, "host");
+        json_builder_add_string_value(builder, host ? host : "");
+        json_builder_set_member_name(builder, "port");
+        json_builder_add_string_value(builder, port > 0 ? g_strdup_printf("%d", port) : "");
+        json_builder_set_member_name(builder, "user");
+        json_builder_add_string_value(builder, "");
+        json_builder_set_member_name(builder, "password");
+        json_builder_add_string_value(builder, "");
+        json_builder_set_member_name(builder, "type");
+        json_builder_add_string_value(builder, "http");
+        json_builder_end_object(builder);
+        g_uri_unref(uri);
+      }
+      if (https_proxy && *https_proxy) {
+        GUri* uri = g_uri_parse(https_proxy, G_URI_FLAGS_NONE, NULL);
+        const gchar* host = g_uri_get_host(uri);
+        gint port = g_uri_get_port(uri);
+        json_builder_begin_object(builder);
+        json_builder_set_member_name(builder, "host");
+        json_builder_add_string_value(builder, host ? host : "");
+        json_builder_set_member_name(builder, "port");
+        json_builder_add_string_value(builder, port > 0 ? g_strdup_printf("%d", port) : "");
+        json_builder_set_member_name(builder, "user");
+        json_builder_add_string_value(builder, "");
+        json_builder_set_member_name(builder, "password");
+        json_builder_add_string_value(builder, "");
+        json_builder_set_member_name(builder, "type");
+        json_builder_add_string_value(builder, "https");
+        json_builder_end_object(builder);
+        g_uri_unref(uri);
+      }
+      g_free(http_proxy);
+      g_free(https_proxy);
+    }
+    g_key_file_free(key_file);
+    g_free(kde_config);
+  }
+
+  // Fallback: environment variables
+  const char* http_proxy = getenv("http_proxy");
+  const char* https_proxy = getenv("https_proxy");
   if (http_proxy) {
+    GUri* uri = g_uri_parse(http_proxy, G_URI_FLAGS_NONE, NULL);
+    const gchar* host = g_uri_get_host(uri);
+    gint port = g_uri_get_port(uri);
     json_builder_begin_object(builder);
     json_builder_set_member_name(builder, "host");
-    json_builder_add_string_value(builder, http_proxy);
+    json_builder_add_string_value(builder, host ? host : "");
     json_builder_set_member_name(builder, "port");
-    json_builder_add_string_value(builder, "");
+    json_builder_add_string_value(builder, port > 0 ? g_strdup_printf("%d", port) : "");
     json_builder_set_member_name(builder, "user");
     json_builder_add_string_value(builder, "");
     json_builder_set_member_name(builder, "password");
@@ -67,13 +172,17 @@ FlMethodResponse* get_platform_proxy(const gchar* url) {
     json_builder_set_member_name(builder, "type");
     json_builder_add_string_value(builder, "http");
     json_builder_end_object(builder);
+    g_uri_unref(uri);
   }
   if (https_proxy) {
+    GUri* uri = g_uri_parse(https_proxy, G_URI_FLAGS_NONE, NULL);
+    const gchar* host = g_uri_get_host(uri);
+    gint port = g_uri_get_port(uri);
     json_builder_begin_object(builder);
     json_builder_set_member_name(builder, "host");
-    json_builder_add_string_value(builder, https_proxy);
+    json_builder_add_string_value(builder, host ? host : "");
     json_builder_set_member_name(builder, "port");
-    json_builder_add_string_value(builder, "");
+    json_builder_add_string_value(builder, port > 0 ? g_strdup_printf("%d", port) : "");
     json_builder_set_member_name(builder, "user");
     json_builder_add_string_value(builder, "");
     json_builder_set_member_name(builder, "password");
@@ -81,8 +190,8 @@ FlMethodResponse* get_platform_proxy(const gchar* url) {
     json_builder_set_member_name(builder, "type");
     json_builder_add_string_value(builder, "https");
     json_builder_end_object(builder);
+    g_uri_unref(uri);
   }
-  // You can add more logic for parsing host/port/user/password if needed
 
   json_builder_end_array(builder);
 
