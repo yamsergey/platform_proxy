@@ -25,8 +25,7 @@ let package = Package(
         ),
         .target(
             name: "platform_proxy_macos",
-            path: "macos/Classes",
-            publicHeadersPath: "."
+            path: "macos/Classes"
         )
     ]
 )
