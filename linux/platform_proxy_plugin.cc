@@ -20,6 +20,7 @@ struct _PlatformProxyPlugin {
 
 G_DEFINE_TYPE(PlatformProxyPlugin, platform_proxy_plugin, g_object_get_type())
 
+// Linux Plugin debug https://gist.github.com/charafau/a496a557b6b7686f491bc5ea75fc2981
 // Called when a method call is received from Flutter.
 static void platform_proxy_plugin_handle_method_call(
     PlatformProxyPlugin* self,
